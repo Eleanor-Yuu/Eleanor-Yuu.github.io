@@ -26,39 +26,48 @@
 
     .book-list {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 1.5rem;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 1rem;
     }
 
     .book-card {
-      padding: 1rem;
+      padding: 0.75rem;
       background: #ffffff;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      border-radius: 10px;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.06);
       transition: transform 0.2s, box-shadow 0.3s;
       cursor: pointer;
+      font-size: 0.85rem;
     }
 
     .book-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+      transform: translateY(-3px);
+      box-shadow: 0 5px 14px rgba(0,0,0,0.1);
+    }
+
+    .book-card img {
+      width: 100%;
+      max-height: 160px;
+      object-fit: contain;
+      border-radius: 6px;
+      margin-bottom: 0.5rem;
     }
 
     .book-card strong {
       font-family: 'Cinzel', serif;
-      font-size: 1.1rem;
+      font-size: 1rem;
       color: #222;
     }
 
     .book-card span {
-      font-size: 0.9rem;
+      font-size: 0.8rem;
       color: #666;
     }
 
     .page-transition {
       position: fixed;
       inset: 0;
-      background: #fcfaf7; /* 可改为封面图渐变等 */
+      background: #fcfaf7;
       z-index: 9999;
       opacity: 0;
       pointer-events: none;
@@ -75,39 +84,40 @@
   <h1>My Bookshelf</h1>
   <div class="book-list">
     <div class="book-card" onclick="navigateWithTransition('reader.html?book=devil_wears_prada')">
-      <img src="devil_wears_prada/devil_wears_prada_cover.png" alt="The Devil Wears Prada Cover" style="width:100%; border-radius:8px; margin-bottom:0.75rem;">
+      <img src="devil_wears_prada/devil_wears_prada_cover.png" alt="The Devil Wears Prada Cover">
       <strong>The Devil Wears Prada</strong><br/>
       <span>Lauren Weisberger</span>
     </div>
     <div class="book-card" onclick="navigateWithTransition('reader.html?book=tuesday_with_morrie')">
-      <img src="tuesday_with_morrie/tuesday_with_morrie_cover.jpg" alt="Tuesday With Morrie Cover" style="width:100%; border-radius:8px; margin-bottom:0.75rem;">
+      <img src="tuesday_with_morrie/tuesday_with_morrie_cover.jpg" alt="Tuesday With Morrie Cover">
       <strong>Tuesday With Morrie</strong><br/>
       <span>Lauren Weisberger</span>
     </div>
     <!-- Add more books here -->
   </div>
   <div class="page-transition active" id="page-transition"></div>
-</body>
 
-<script>
-  function navigateWithTransition(targetUrl) {
-    const transitionEl = document.getElementById('page-transition');
-    if (transitionEl) {
-      transitionEl.classList.add('active');
-      setTimeout(() => {
+  <script>
+    function navigateWithTransition(targetUrl) {
+      const transitionEl = document.getElementById('page-transition');
+      if (transitionEl) {
+        transitionEl.classList.add('active');
+        setTimeout(() => {
+          window.location.href = targetUrl;
+        }, 500);
+      } else {
         window.location.href = targetUrl;
-      }, 500);
-    } else {
-      window.location.href = targetUrl;
+      }
     }
-  }
-  window.addEventListener('DOMContentLoaded', () => {
-    const transitionEl = document.getElementById('page-transition');
-    if (transitionEl) {
-      setTimeout(() => {
-        transitionEl.classList.remove('active');
-      }, 30);
-    }
-  });
-</script>
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const transitionEl = document.getElementById('page-transition');
+      if (transitionEl) {
+        setTimeout(() => {
+          transitionEl.classList.remove('active');
+        }, 30);
+      }
+    });
+  </script>
+</body>
 </html>

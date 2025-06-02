@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond&family=Cinzel:wght@600&display=swap" rel="stylesheet">
   <title>Annotated Reader</title>
   <style>
     body {
@@ -17,13 +18,13 @@
     #chapter-title {
       position: relative;
       font-size: 2rem;
-      margin: 2rem auto 1rem;
-      font-weight: bold;
+      font-weight: 600;
       padding-bottom: 0.5rem;
-      color: #2c3e50;
-      text-align: left; 
+      color: #1f1f1f;
+      text-align: left;
+      font-family: 'Cinzel', serif;
+      letter-spacing: 1px;
     }
-
     #chapter-title::after {
       content: "";
       display: block;
@@ -232,8 +233,10 @@
 <div class="page-transition active" id="transition-cover"></div>
 <div id="audio-player">
   <button id="play-btn"><i class="fas fa-play"></i></button>
+  <span id="current-time">0:00</span>
   <input type="range" id="progress-bar" value="0" min="0" max="100" />
-  <audio id="audio" src="audio/ch1.mp3"></audio> <!-- 音频文件路径 -->
+  <span id="duration">0:00</span>
+  <audio id="audio" src="audio/ch1.mp3"></audio>
 </div>
 
 <script>
@@ -521,6 +524,27 @@ audio.addEventListener('ended', () => {
 audio.addEventListener('timeupdate', () => {
   const percent = (audio.currentTime / audio.duration) * 100;
   progressBar.value = percent;
+});
+
+const currentTimeDisplay = document.getElementById('current-time');
+const durationDisplay = document.getElementById('duration');
+
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs < 10 ? '0' + secs : secs}`;
+}
+
+// 每次播放时更新进度条和当前时间
+audio.addEventListener('timeupdate', () => {
+  const percent = (audio.currentTime / audio.duration) * 100;
+  progressBar.value = percent;
+  currentTimeDisplay.textContent = formatTime(audio.currentTime);
+});
+
+// 在 metadata 加载完成后，设置总时长
+audio.addEventListener('loadedmetadata', () => {
+  durationDisplay.textContent = formatTime(audio.duration);
 });
 
 progressBar.addEventListener('input', () => {
