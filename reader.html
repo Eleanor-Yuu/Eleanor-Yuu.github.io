@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Annotated Reader</title>
+  <style>
+    body {
+      font-family: 'Georgia', serif;
+      padding: 1rem 1.5rem;
+      line-height: 1.6;
+      max-width: 900px;
+      margin: auto;
+      font-size: 1.2rem;
+      background: #fcfaf7;
+    }
+    #chapter-title {
+      position: relative;
+      font-size: 2rem;
+      margin: 2rem auto 1rem;
+      font-weight: bold;
+      padding-bottom: 0.5rem;
+      color: #2c3e50;
+      text-align: left; 
+    }
+
+    #chapter-title::after {
+      content: "";
+      display: block;
+      height: 2px;
+      background-color: #ddd;
+      margin: 1rem auto 0;
+      margin-left: 0; 
+    }
+    #menu-toggle {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      width: 48px;
+      height: 48px;
+      background-color: rgba(51, 51, 51, 0.3);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      font-size: 1.5rem;
+      z-index: 2000;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    #back-button{
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      width: 48px;
+      height: 48px;
+      background-color: rgba(51, 51, 51, 0.3);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      font-size: 1.5rem;
+      z-index: 2000;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+
+    #chapter-menu {
+      position: fixed;
+      top: 4.5rem;
+      right: 1rem;
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 0.75rem 1rem;
+      z-index: 1500;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+      color: #fff;
+      font-size: 0.95rem;
+      line-height: 1.4;
+      opacity: 0;
+      transform: translateY(-10px);
+      pointer-events: none;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    #chapter-menu.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    #chapter-menu ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    #chapter-menu li {
+      margin: 0.5rem 0;
+    }
+
+    #chapter-menu a {
+      color: #3b3b3b;
+      text-decoration: none;
+    }
+
+    #chapter-menu a.active {
+      text-decoration: underline;
+    }
+    .annotated {
+      background-color: rgba(255, 244, 214, 0.9);
+      border-bottom: 1px dashed #aaa;
+      border-radius: 3px;
+      padding: 0 2px;
+      transition: background-color 0.2s;
+      cursor: pointer;
+    }
+
+    .annotated:hover {
+      background-color: #ffe8b3;
+    }
+
+    .tooltip {
+      position: absolute;
+      background-color: #f9f9f9;
+      color: #333;
+      border: 1px solid #ccc;
+      padding: 0.5rem;
+      z-index: 1000;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      font-size: 0.9rem;
+      word-wrap: break-word;
+      width: 400px;
+      border-radius: 4px;
+      pointer-events: none;
+
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    .tooltip.show {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    .tooltip::after {
+      content: "";
+      position: absolute;
+      top: -8px;
+      left: 20px;
+      border-width: 8px;
+      border-style: solid;
+      border-color: transparent transparent #f9f9f9 transparent;
+    }
+    .page-transition {
+      position: fixed;
+      inset: 0;
+      background: #fcfaf7;
+      z-index: 9999;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease;
+    }
+    .page-transition.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+    #audio-player {
+      position: fixed;
+      bottom: 3rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(4px);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      border-radius: 24px;
+      padding: 0.5rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      z-index: 1000;
+    }
+
+    #audio-player button {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: #333;
+    }
+
+    #progress-bar {
+      width: 300px;
+      height: 6px;
+      border-radius: 4px;
+      background: #ddd;
+      appearance: none;
+    }
+    @media (max-width: 600px) {
+      .tooltip {
+        font-size: 0.85rem;
+        width: 75vw;
+        padding: 0.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+<button id="menu-toggle"><i class="fas fa-bars"></i></button>
+<button id="back-button" style="position:fixed;top:1rem;right:5rem;width:48px;height:48px;background-color:rgba(51,51,51,0.3);color:white;border:none;border-radius:50%;font-size:1.5rem;z-index:2000;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+  <i class="fas fa-book"></i></button>
+</button>
+<div id="chapter-menu">
+  <ul id="chapter-list">
+    <!-- 动态插入章节 -->
+  </ul>
+</div>
+<h2 id="chapter-title"></h2>
+<div id="content">Loading...</div>
+<div class="tooltip" id="tooltip"></div>
+<div class="page-transition active" id="transition-cover"></div>
+<div id="audio-player">
+  <button id="play-btn"><i class="fas fa-play"></i></button>
+  <input type="range" id="progress-bar" value="0" min="0" max="100" />
+  <audio id="audio" src="audio/ch1.mp3"></audio> <!-- 音频文件路径 -->
+</div>
+
+<script>
+const params = new URLSearchParams(location.search);
+const book = params.get('book');
+const contentDiv = document.getElementById('content');
+const tooltip = document.getElementById('tooltip');
+const title = document.getElementById('chapter-title');
+let currentChapterId = '';
+
+window.addEventListener('DOMContentLoaded', () => {
+  const cover = document.getElementById('transition-cover');
+  if (cover) {
+    setTimeout(() => {
+      cover.classList.remove('active');
+    }, 30); // 进入时立即淡入
+  }
+});
+
+function generateChapterMenu() {
+  const chapterListEl = document.getElementById('chapter-list');
+  fetch(`${book}/chapter_list.json`)
+    .then(response => response.json())
+    .then(chapters => {
+      chapters.forEach((ch, idx) => {
+        const li = document.createElement('li');
+        li.innerHTML = `<a href="#" data-chapter="${ch.id}">${ch.title}</a>`;
+        chapterListEl.appendChild(li);
+      });
+
+      // 绑定点击事件
+      document.querySelectorAll('#chapter-menu a').forEach(link => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          loadChapter(link.dataset.chapter);
+          document.getElementById('chapter-menu').classList.remove('visible');
+        });
+      });
+
+      // 默认加载第一章
+      loadChapter(chapters[0].id);
+    });
+}
+
+function loadChapter(chapterId) {
+  if (chapterId === currentChapterId) return;
+  currentChapterId = chapterId;
+  title.textContent = `Chapter ${chapterId.replace('ch', '')}`;
+  document.querySelectorAll('#chapter-menu a').forEach(link => {
+    link.classList.toggle('active', link.dataset.chapter === chapterId);
+  });
+  contentDiv.innerHTML = '';
+  tooltip.classList.remove('show');
+  
+  audio.src = `${book}/audio/${chapterId} - ${book}.mp3`;
+  audio.load();
+  progressBar.value = 0;
+  playBtn.innerHTML = '<i class="fas fa-play"></i>';
+
+  
+  fetch(`${book}/text/${book}_${chapterId}.json`)
+    .then(response => response.json())
+    .then(data => {
+      data.paragraphs.forEach(paragraph => {
+  let rawText = paragraph.text;
+  const annotations = paragraph.annotations || [];
+
+  if (annotations.length > 0) {
+    // 标记哪些字符已被替换，避免重叠
+    const occupied = new Array(rawText.length).fill(false);
+    const inserts = [];
+
+    // 按短语长度降序，优先替换长的
+    annotations.sort((a, b) => b.phrase.length - a.phrase.length);
+
+    annotations.forEach(ann => {
+      const escaped = ann.phrase.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const regex = new RegExp(escaped, 'gi');
+      let match;
+      while ((match = regex.exec(rawText)) !== null) {
+        const start = match.index;
+        const end = regex.lastIndex;
+
+        // 检查是否和已有插入冲突
+        if (occupied.slice(start, end).some(x => x)) continue;
+
+        // 记录插入点
+        inserts.push({
+          start,
+          end,
+          phrase: match[0],
+          tooltip: ann.explanation.replace(/"/g, '&quot;')
+        });
+
+        // 标记已使用
+        for (let i = start; i < end; i++) {
+          occupied[i] = true;
+        }
+      }
+    });
+
+    // 按 start 倒序插入 span（避免索引偏移）
+    inserts.sort((a, b) => b.start - a.start);
+    inserts.forEach(ins => {
+      const before = rawText.slice(0, ins.start);
+      const span = `<span class="annotated" data-tooltip="${ins.tooltip}">${ins.phrase}</span>`;
+      const after = rawText.slice(ins.end);
+      rawText = before + span + after;
+    });
+  }
+
+  const p = document.createElement('p');
+  p.innerHTML = rawText;
+  contentDiv.appendChild(p);
+});
+
+      document.querySelectorAll('.annotated').forEach(el => {
+        el.addEventListener('click', () => {
+          tooltip.innerHTML = el.dataset.tooltip;
+          tooltip.classList.add('show');
+
+          const scrollTop = window.scrollY || document.documentElement.scrollTop;
+          const range = document.createRange();
+          range.setStart(el.firstChild, 0);
+          range.setEnd(el.firstChild, 1);
+          const rect = range.getBoundingClientRect();
+
+          let tooltipLeft = rect.left;
+          let tooltipTop = rect.bottom + scrollTop + 1;
+
+          tooltip.style.left = `${tooltipLeft}px`;
+          tooltip.style.top = `${tooltipTop}px`;
+          tooltip.style.transform = 'translateX(0)';
+
+          requestAnimationFrame(() => {
+            const tooltipRect = tooltip.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            if (tooltipRect.left < 8) tooltip.style.left = `8px`;
+            if (tooltipRect.right > viewportWidth - 8)
+              tooltip.style.left = `${viewportWidth - tooltipRect.width - 8}px`;
+            const spaceBelow = viewportHeight - rect.bottom;
+            const spaceAbove = rect.top;
+            if (tooltipRect.height > spaceBelow && spaceAbove > tooltipRect.height + 12) {
+              tooltipTop = rect.top + scrollTop - tooltipRect.height - 8;
+              tooltip.style.top = `${tooltipTop}px`;
+            }
+          });
+        });
+      });
+    });
+}
+
+document.getElementById('menu-toggle').addEventListener('click', () => {
+  document.getElementById('chapter-menu').classList.toggle('visible');
+});
+
+document.querySelectorAll('#chapter-menu a').forEach(link => {
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    loadChapter(link.dataset.chapter);
+    document.getElementById('chapter-menu').classList.remove('visible');
+  });
+});
+
+document.addEventListener('click', (e) => {
+  if (!e.target.classList.contains('annotated')) {
+    tooltip.classList.remove('show');
+  }
+});
+
+document.getElementById('back-button').addEventListener('click', () => {
+  const cover = document.getElementById('transition-cover');
+    cover.classList.add('active');
+    setTimeout(() => {
+      window.location.href = 'index.html';
+    }, 500);
+});
+
+document.addEventListener('dblclick', async (e) => {
+  const word = window.getSelection().toString().trim().toLowerCase();
+  if (!word || /\s/.test(word)) return;
+
+  // 清空并显示加载中
+  tooltip.innerHTML = '查询中...';
+  tooltip.classList.add('show');
+
+  // 通过选中文本的 range 获取准确位置
+  const selection = window.getSelection();
+  if (!selection.rangeCount) return;
+  const range = selection.getRangeAt(0).cloneRange();
+  const rect = range.getBoundingClientRect();
+  const scrollTop = window.scrollY || document.documentElement.scrollTop;
+  const scrollLeft = window.scrollX || document.documentElement.scrollLeft;
+
+  // 初始位置
+  tooltip.style.left = `${rect.left + scrollLeft}px`;
+  tooltip.style.top = `${rect.bottom + scrollTop + 6}px`;
+  tooltip.style.transform = 'translateX(0)';
+
+  let html = `<strong>${word}</strong><br>`;
+
+  try {
+    const [enRes, zhRes] = await Promise.all([
+      fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`).then(r => r.json()).catch(() => null),
+      fetch(`https://v2.xxapi.cn/api/englishwords?word=${encodeURIComponent(word)}`).then(r => r.json()).catch(() => null)
+    ]);
+
+    if (Array.isArray(enRes) && enRes[0]?.meanings?.length) {
+      const phonetic = enRes[0].phonetics?.find(p => p.text)?.text || '';
+      if (phonetic) html += `<span style="color:gray;">/${phonetic}/</span><br>`;
+      const defs = enRes[0].meanings
+        .slice(0, 2)
+        .map(m => `<div><em>${m.partOfSpeech}</em>: ${m.definitions?.[0]?.definition}</div>`);
+      html += defs.join('');
+    }
+
+    if (zhRes?.data) {
+      const data = zhRes.data;
+
+      if (data.translations?.length > 0) {
+        html += `<ul style="margin: 0.5rem 0; color: #006600; padding-left: 1.2rem;">`;
+        data.translations.forEach(t => {
+          html += `<li><em>${t.pos}</em>：${t.tran_cn}</li>`;
+        });
+        html += `</ul>`;
+      }
+
+      if (data.explains?.length) {
+        html += `<div style="color:#444; font-size:0.95rem; margin-top:4px;">`;
+        html += data.explains.map(e => `<div>🔹 ${e}</div>`).join('');
+        html += `</div>`;
+      }
+
+      html += `</div>`;
+    }
+
+    tooltip.innerHTML = html || '未找到定义';
+
+    // 避免 tooltip 溢出屏幕
+    requestAnimationFrame(() => {
+      const tooltipRect = tooltip.getBoundingClientRect();
+      const vw = window.innerWidth, vh = window.innerHeight;
+
+      if (tooltipRect.left < 8) {
+        tooltip.style.left = `${8 + scrollLeft}px`;
+      } else if (tooltipRect.right > vw - 8) {
+        tooltip.style.left = `${vw - tooltipRect.width - 8 + scrollLeft}px`;
+      }
+
+      const spaceBelow = vh - rect.bottom;
+      const spaceAbove = rect.top;
+      if (tooltipRect.height > spaceBelow && spaceAbove > tooltipRect.height + 12) {
+        const newTop = rect.top + scrollTop - tooltipRect.height - 8;
+        tooltip.style.top = `${newTop}px`;
+      }
+    });
+
+  } catch (err) {
+    tooltip.innerHTML = '查词失败';
+  }
+});
+
+const audio = document.getElementById('audio');
+const playBtn = document.getElementById('play-btn');
+const progressBar = document.getElementById('progress-bar');
+
+let isPlaying = false;
+
+playBtn.addEventListener('click', () => {
+  if (audio.paused) {
+    audio.play();
+    playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+  } else {
+    audio.pause();
+    playBtn.innerHTML = '<i class="fas fa-play"></i>';
+  }
+});
+
+audio.addEventListener('ended', () => {
+  playBtn.innerHTML = '<i class="fas fa-play"></i>';
+  progressBar.value = 0;
+});
+
+audio.addEventListener('timeupdate', () => {
+  const percent = (audio.currentTime / audio.duration) * 100;
+  progressBar.value = percent;
+});
+
+progressBar.addEventListener('input', () => {
+  const percent = progressBar.value;
+  audio.currentTime = (percent / 100) * audio.duration;
+});
+generateChapterMenu(); 
+</script>
+</body>
+</html>
