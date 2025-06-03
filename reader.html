@@ -488,13 +488,28 @@ function handleWordLookup(word) {
 }
 
 document.addEventListener('click', (e) => {
-  // 忽略 UI 元素（如按钮、链接、输入框）
+  // 忽略按钮、链接、输入框
   if (['BUTTON', 'A', 'INPUT'].includes(e.target.tagName)) return;
 
-  const selection = window.getSelection();
-  const word = selection.toString().trim().toLowerCase();
+  // 获取鼠标位置处的文本节点
+  const range = document.caretRangeFromPoint
+    ? document.caretRangeFromPoint(e.clientX, e.clientY)
+    : null;
 
-  if (!word || /\s/.test(word)) return;
+  if (!range || !range.startContainer || range.startContainer.nodeType !== Node.TEXT_NODE) return;
+
+  const text = range.startContainer.textContent;
+  const offset = range.startOffset;
+
+  // 找出点击位置所在单词
+  let start = offset;
+  let end = offset;
+
+  while (start > 0 && /\w/.test(text[start - 1])) start--;
+  while (end < text.length && /\w/.test(text[end])) end++;
+
+  const word = text.slice(start, end).trim().toLowerCase();
+  if (!word || /\s/.test(word) || !/^[a-z]+$/i.test(word)) return;
 
   handleWordLookup(word);
 });
