@@ -1,0 +1,14 @@
+[
+    {
+      "title": "The Great Gatsby",
+      "author": "F. Scott Fitzgerald",
+      "file": "gatsby.epub",
+      "chapters": 9
+    },
+    {
+      "title": "Pride and Prejudice",
+      "author": "Jane Austen",
+      "file": "pride_and_prejudice.epub",
+      "chapters": 61
+    }
+  ]

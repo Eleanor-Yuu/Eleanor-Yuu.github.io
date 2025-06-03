@@ -226,7 +226,6 @@
 </button>
 <div id="chapter-menu">
   <ul id="chapter-list">
-    <!-- 动态插入章节 -->
   </ul>
 </div>
 <h2 id="chapter-title"></h2>
@@ -260,7 +259,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
 function generateChapterMenu() {
   const chapterListEl = document.getElementById('chapter-list');
-  fetch(`${book}/chapter_list.json`)
+  fetch(`books/${book}/chapter_list.json`)
     .then(response => response.json())
     .then(chapters => {
       chapters.forEach((ch, idx) => {
@@ -293,13 +292,13 @@ function loadChapter(chapterId) {
   contentDiv.innerHTML = '';
   tooltip.classList.remove('show');
   
-  audio.src = `${book}/audio/${chapterId} - ${book}.mp3`;
+  audio.src = `books/${book}/audio/${chapterId} - ${book}.mp3`;
   audio.load();
   progressBar.value = 0;
   playBtn.innerHTML = '<i class="fas fa-play"></i>';
 
   
-  fetch(`${book}/text/${book}_${chapterId}.json`)
+  fetch(`books/${book}/text/${book}_${chapterId}.json`)
     .then(response => response.json())
     .then(data => {
       data.paragraphs.forEach(paragraph => {
@@ -417,16 +416,24 @@ document.getElementById('back-button').addEventListener('click', () => {
       window.location.href = 'index.html';
     }, 500);
 });
+////双击查词
+let lastTouchTime = 0;
 
-document.addEventListener('dblclick', async (e) => {
-  const word = window.getSelection().toString().trim().toLowerCase();
-  if (!word || /\s/.test(word)) return;
+document.addEventListener('touchstart', (e) => {
+  const now = Date.now();
+  if (now - lastTouchTime <= 400) {
+    // 模拟双击行为
+    const word = window.getSelection().toString().trim().toLowerCase();
+    if (!word || /\s/.test(word)) return;
+    handleWordLookup(word);
+  }
+  lastTouchTime = now;
+});
 
-  // 清空并显示加载中
+function handleWordLookup(word) {
   tooltip.innerHTML = '查询中...';
   tooltip.classList.add('show');
 
-  // 通过选中文本的 range 获取准确位置
   const selection = window.getSelection();
   if (!selection.rangeCount) return;
   const range = selection.getRangeAt(0).cloneRange();
@@ -434,19 +441,16 @@ document.addEventListener('dblclick', async (e) => {
   const scrollTop = window.scrollY || document.documentElement.scrollTop;
   const scrollLeft = window.scrollX || document.documentElement.scrollLeft;
 
-  // 初始位置
   tooltip.style.left = `${rect.left + scrollLeft}px`;
   tooltip.style.top = `${rect.bottom + scrollTop + 6}px`;
   tooltip.style.transform = 'translateX(0)';
 
   let html = `<strong>${word}</strong><br>`;
 
-  try {
-    const [enRes, zhRes] = await Promise.all([
-      fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`).then(r => r.json()).catch(() => null),
-      fetch(`https://v2.xxapi.cn/api/englishwords?word=${encodeURIComponent(word)}`).then(r => r.json()).catch(() => null)
-    ]);
-
+  Promise.all([
+    fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`).then(r => r.json()).catch(() => null),
+    fetch(`https://v2.xxapi.cn/api/englishwords?word=${encodeURIComponent(word)}`).then(r => r.json()).catch(() => null)
+  ]).then(([enRes, zhRes]) => {
     if (Array.isArray(enRes) && enRes[0]?.meanings?.length) {
       const phonetic = enRes[0].phonetics?.find(p => p.text)?.text || '';
       if (phonetic) html += `<span style="color:gray;">/${phonetic}/</span><br>`;
@@ -456,52 +460,26 @@ document.addEventListener('dblclick', async (e) => {
       html += defs.join('');
     }
 
-    if (zhRes?.data) {
-      const data = zhRes.data;
-
-      if (data.translations?.length > 0) {
-        html += `<ul style="margin: 0.5rem 0; color: #006600; padding-left: 1.2rem;">`;
-        data.translations.forEach(t => {
-          html += `<li><em>${t.pos}</em>：${t.tran_cn}</li>`;
-        });
-        html += `</ul>`;
-      }
-
-      if (data.explains?.length) {
-        html += `<div style="color:#444; font-size:0.95rem; margin-top:4px;">`;
-        html += data.explains.map(e => `<div>🔹 ${e}</div>`).join('');
-        html += `</div>`;
-      }
-
-      html += `</div>`;
+    if (zhRes?.data?.translations?.length > 0) {
+      html += `<ul style="margin: 0.5rem 0; color: #006600; padding-left: 1.2rem;">`;
+      zhRes.data.translations.forEach(t => {
+        html += `<li><em>${t.pos}</em>：${t.tran_cn}</li>`;
+      });
+      html += `</ul>`;
     }
 
     tooltip.innerHTML = html || '未找到定义';
-
-    // 避免 tooltip 溢出屏幕
-    requestAnimationFrame(() => {
-      const tooltipRect = tooltip.getBoundingClientRect();
-      const vw = window.innerWidth, vh = window.innerHeight;
-
-      if (tooltipRect.left < 8) {
-        tooltip.style.left = `${8 + scrollLeft}px`;
-      } else if (tooltipRect.right > vw - 8) {
-        tooltip.style.left = `${vw - tooltipRect.width - 8 + scrollLeft}px`;
-      }
-
-      const spaceBelow = vh - rect.bottom;
-      const spaceAbove = rect.top;
-      if (tooltipRect.height > spaceBelow && spaceAbove > tooltipRect.height + 12) {
-        const newTop = rect.top + scrollTop - tooltipRect.height - 8;
-        tooltip.style.top = `${newTop}px`;
-      }
-    });
-
-  } catch (err) {
+  }).catch(() => {
     tooltip.innerHTML = '查词失败';
-  }
-});
+  });
+}
 
+document.addEventListener('dblclick', (e) => {
+  const word = window.getSelection().toString().trim().toLowerCase();
+  if (!word || /\s/.test(word)) return;
+  handleWordLookup(word);
+});
+////音频播放
 const audio = document.getElementById('audio');
 const playBtn = document.getElementById('play-btn');
 const progressBar = document.getElementById('progress-bar');
@@ -553,6 +531,8 @@ progressBar.addEventListener('input', () => {
   const percent = progressBar.value;
   audio.currentTime = (percent / 100) * audio.duration;
 });
+
+////
 generateChapterMenu(); 
 </script>
 </body>
