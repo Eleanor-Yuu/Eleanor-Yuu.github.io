@@ -431,6 +431,7 @@ function loadChapter(chapterId) {
         // ⭐ 为动态生成的所有单词绑定双击事件
         document.querySelectorAll('.word').forEach(el => {
           el.addEventListener('dblclick', (e) => {
+            e.stopPropagation(); 
             const word = el.dataset.word?.toLowerCase();
             if (word && word.length < 30) {
               handleWordLookup(word, el);
