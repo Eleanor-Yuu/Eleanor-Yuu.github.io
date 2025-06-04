@@ -2,10 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <link href="https://fonts.googleapis.com/css2?family=EB+Garamond&family=Cinzel:wght@600&display=swap" rel="stylesheet">
   <title>Annotated Reader</title>
   <style>
+    * {
+      user-select: none !important;
+      -webkit-user-select: none !important; /* Safari */
+      -ms-user-select: none !important;     /* IE/Edge */
+    }
     body {
       font-family: 'Georgia', serif;
       padding: 1rem 1.5rem;
@@ -125,8 +130,8 @@
       cursor: pointer;
     }
 
-    .annotated:hover {
-      background-color: #ffe8b3;
+    .annotated.active {
+      background-color: #ffe8b3 !important;
     }
 
     .tooltip {
@@ -190,7 +195,7 @@
       align-items: center;
       gap: 1rem;
       z-index: 1000;
-      max-width: 90vw; /* ⭐ 限制最大宽度为视口宽度的 90% */
+      max-width: 85vw; /* ⭐ 限制最大宽度为视口宽度的 90% */
     }
 
     #audio-player button {
@@ -207,8 +212,16 @@
       border-radius: 4px;
       background: #ddd;
       appearance: none;
-      max-width: 90vw; /* ⭐ 限制最大宽度为视口宽度的 90% */
+      max-width: 80vw; /* ⭐ 限制最大宽度为视口宽度的 90% */
     }
+
+    .word {
+      user-select: none;
+      -webkit-user-select: none;
+      cursor: pointer;
+      padding: 0 1px;
+    }
+
     @media (max-width: 600px) {
       .tooltip {
         font-size: 0.85rem;
@@ -241,6 +254,24 @@
 </div>
 
 <script>
+// 禁止右键菜单（PC）
+document.addEventListener('contextmenu', e => e.preventDefault());
+
+// 禁止复制
+document.addEventListener('copy', e => e.preventDefault());
+
+// 禁止选中
+document.addEventListener('selectstart', e => e.preventDefault());
+
+// 禁止长按（Android/iOS）
+document.addEventListener('touchstart', e => {
+  if (e.touches.length > 1) e.preventDefault();  // 多指缩放
+}, { passive: false });
+
+document.addEventListener('gesturestart', e => e.preventDefault()); // iOS 手势缩放
+
+
+////
 const params = new URLSearchParams(location.search);
 const book = params.get('book');
 const contentDiv = document.getElementById('content');
@@ -302,69 +333,126 @@ function loadChapter(chapterId) {
     .then(response => response.json())
     .then(data => {
       data.paragraphs.forEach(paragraph => {
-  let rawText = paragraph.text;
-  const annotations = paragraph.annotations || [];
+        const p = document.createElement('p');
+        const annotations = paragraph.annotations || [];
+        let text = paragraph.text;
+      
+        // 先对注释短语排序，确保长短语先匹配
+        annotations.sort((a, b) => b.phrase.length - a.phrase.length);
+      
+        // 做一个记录，哪些位置已经插入 span，防止重复匹配
+        const used = new Array(text.length).fill(false);
+      
+        // 用来记录最终构建的 HTML 元素列表
+        const outputFragments = [];
+      
+        let position = 0;
+        const matches = [];
 
-  if (annotations.length > 0) {
-    // 标记哪些字符已被替换，避免重叠
-    const occupied = new Array(rawText.length).fill(false);
-    const inserts = [];
+        // 查找所有注释短语在 text 中的位置
+        annotations.forEach(ann => {
+          const phrase = ann.phrase;
+          const explanation = ann.explanation.replace(/"/g, '&quot;');
+          const regex = new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
 
-    // 按短语长度降序，优先替换长的
-    annotations.sort((a, b) => b.phrase.length - a.phrase.length);
-
-    annotations.forEach(ann => {
-      const escaped = ann.phrase.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
-      const regex = new RegExp(escaped, 'gi');
-      let match;
-      while ((match = regex.exec(rawText)) !== null) {
-        const start = match.index;
-        const end = regex.lastIndex;
-
-        // 检查是否和已有插入冲突
-        if (occupied.slice(start, end).some(x => x)) continue;
-
-        // 记录插入点
-        inserts.push({
-          start,
-          end,
-          phrase: match[0],
-          tooltip: ann.explanation.replace(/"/g, '&quot;')
+          let match;
+          while ((match = regex.exec(text)) !== null) {
+            matches.push({
+              start: match.index,
+              end: match.index + match[0].length,
+              phrase: match[0],
+              explanation: explanation
+            });
+          }
         });
 
-        // 标记已使用
-        for (let i = start; i < end; i++) {
-          occupied[i] = true;
+        // 按开始位置排序，避免重叠
+        matches.sort((a, b) => a.start - b.start);
+
+        let cursor = 0;
+        for (const match of matches) {
+          if (match.start > cursor) {
+            // 非注释区域，拆成词再包裹
+            const nonAnnotated = text.slice(cursor, match.start);
+            nonAnnotated.split(/(\s+)/).forEach(token => {
+              if (token.trim() === '') {
+                outputFragments.push(document.createTextNode(token));
+              } else {
+                const span = document.createElement('span');
+                span.className = 'word';
+                span.textContent = token;
+                span.dataset.word = token.toLowerCase();
+                outputFragments.push(span);
+              }
+            });
+          }
+
+          // 注释短语
+          const annotatedSpan = document.createElement('span');
+          annotatedSpan.className = 'annotated';
+          annotatedSpan.dataset.word = match.phrase.toLowerCase();
+          annotatedSpan.dataset.tooltip = match.explanation;
+
+          match.phrase.split(/(\s+)/).forEach(token => {
+            if (token.trim() === '') {
+              annotatedSpan.appendChild(document.createTextNode(token));
+            } else {
+              const wordSpan = document.createElement('span');
+              wordSpan.className = 'word';
+              wordSpan.textContent = token;
+              wordSpan.dataset.word = token.toLowerCase();
+              annotatedSpan.appendChild(wordSpan);
+            }
+          });
+
+          outputFragments.push(annotatedSpan);
+
+          cursor = match.end;
         }
-      }
-    });
 
-    // 按 start 倒序插入 span（避免索引偏移）
-    inserts.sort((a, b) => b.start - a.start);
-    inserts.forEach(ins => {
-      const before = rawText.slice(0, ins.start);
-      const span = `<span class="annotated" data-tooltip="${ins.tooltip}">${ins.phrase}</span>`;
-      const after = rawText.slice(ins.end);
-      rawText = before + span + after;
-    });
-  }
-
-  const p = document.createElement('p');
-  p.innerHTML = rawText;
-  contentDiv.appendChild(p);
-});
-
+        // 处理最后剩余部分
+        if (cursor < text.length) {
+          const tail = text.slice(cursor);
+          tail.split(/(\s+)/).forEach(token => {
+            if (token.trim() === '') {
+              outputFragments.push(document.createTextNode(token));
+            } else {
+              const span = document.createElement('span');
+              span.className = 'word';
+              span.textContent = token;
+              span.dataset.word = token.toLowerCase();
+              outputFragments.push(span);
+            }
+          });
+        }
+        // 添加结果到段落
+        outputFragments.forEach(frag => p.appendChild(frag));
+        contentDiv.appendChild(p);
+        // ⭐ 为动态生成的所有单词绑定双击事件
+        document.querySelectorAll('.word').forEach(el => {
+          el.addEventListener('dblclick', (e) => {
+            const word = el.dataset.word?.toLowerCase();
+            if (word && word.length < 30) {
+              handleWordLookup(word, el);
+            }
+          });
+        });
+      });
       document.querySelectorAll('.annotated').forEach(el => {
         el.addEventListener('click', () => {
           const phrase = el.textContent;
           const currentTooltip = tooltip.dataset.activeWord;
 
           if (tooltip.classList.contains('show') && currentTooltip === phrase) {
-            // 再次点击同一个词 -> 隐藏
             tooltip.classList.remove('show');
             tooltip.dataset.activeWord = '';
+            document.querySelectorAll('.annotated.active').forEach(e => e.classList.remove('active'));
             return;
           }
+          
+          // 否则是点击了新词，切换高亮
+          document.querySelectorAll('.annotated.active').forEach(e => e.classList.remove('active'));
+          el.classList.add('active');
 
           tooltip.innerHTML = el.dataset.tooltip;
           tooltip.classList.add('show');
@@ -415,8 +503,11 @@ document.querySelectorAll('#chapter-menu a').forEach(link => {
 });
 
 document.addEventListener('click', (e) => {
-  if (!e.target.classList.contains('annotated')) {
+  // 如果点击的不是词语注释，也不是 tooltip 本身
+  if (!e.target.closest('.annotated') && !e.target.closest('#tooltip')) {
     tooltip.classList.remove('show');
+    tooltip.dataset.activeWord = '';
+    document.querySelectorAll('.annotated.active').forEach(el => el.classList.remove('active'));
   }
 });
 
@@ -429,15 +520,11 @@ document.getElementById('back-button').addEventListener('click', () => {
 });
 
 ////双击查词
-
-function handleWordLookup(word) {
+function handleWordLookup(word, element) {
   tooltip.innerHTML = '查询中...';
   tooltip.classList.add('show');
 
-  const selection = window.getSelection();
-  if (!selection.rangeCount) return;
-  const range = selection.getRangeAt(0).cloneRange();
-  const rect = range.getBoundingClientRect();
+  const rect = element.getBoundingClientRect(); // ✅ 获取目标元素的位置
   const scrollTop = window.scrollY || document.documentElement.scrollTop;
   const scrollLeft = window.scrollX || document.documentElement.scrollLeft;
 
@@ -458,6 +545,7 @@ function handleWordLookup(word) {
       tooltip.style.top = `${tooltipTop}px`;
     }
   });
+
   let html = `<strong>${word}</strong><br>`;
 
   Promise.all([
@@ -486,33 +574,6 @@ function handleWordLookup(word) {
     tooltip.innerHTML = '查词失败';
   });
 }
-
-document.addEventListener('click', (e) => {
-  // 忽略按钮、链接、输入框
-  if (['BUTTON', 'A', 'INPUT'].includes(e.target.tagName)) return;
-
-  // 获取鼠标位置处的文本节点
-  const range = document.caretRangeFromPoint
-    ? document.caretRangeFromPoint(e.clientX, e.clientY)
-    : null;
-
-  if (!range || !range.startContainer || range.startContainer.nodeType !== Node.TEXT_NODE) return;
-
-  const text = range.startContainer.textContent;
-  const offset = range.startOffset;
-
-  // 找出点击位置所在单词
-  let start = offset;
-  let end = offset;
-
-  while (start > 0 && /\w/.test(text[start - 1])) start--;
-  while (end < text.length && /\w/.test(text[end])) end++;
-
-  const word = text.slice(start, end).trim().toLowerCase();
-  if (!word || /\s/.test(word) || !/^[a-z]+$/i.test(word)) return;
-
-  handleWordLookup(word);
-});
 
 ////音频播放
 const audio = document.getElementById('audio');
